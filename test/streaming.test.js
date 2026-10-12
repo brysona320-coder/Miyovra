@@ -184,6 +184,11 @@ test("Consumet rejects malformed responses and non-HTTPS video URLs", async () =
 });
 
 test("HentaiOcean resolves a slug and uses its documented embed player", async () => {
+  const previousWindow = globalThis.window;
+  const previousStorage = globalThis.localStorage;
+  globalThis.window = { __miyovraUser: { id: "test-adult" } };
+  globalThis.localStorage = { getItem: () => "true" };
+  try {
   await withFetch(
     { info: [{ urlname: "sample-title-1", videoname: "Sample Title 1" }] },
     async (request) => {
@@ -193,6 +198,7 @@ test("HentaiOcean resolves a slug and uses its documented embed player", async (
         query: "Sample Title 1",
       });
       assert.match(request().url, /action=hentai/);
+      assert.equal(new URL(request().url).pathname, "/api");
       assert.equal(matches[0].id, "sample-title-1");
     },
   );
@@ -203,4 +209,8 @@ test("HentaiOcean resolves a slug and uses its documented embed player", async (
   });
   assert.equal(result.embed, "https://hentaiocean.com/embed/sample-title-1?la=1");
   assert.deepEqual(result.sources, []);
+  } finally {
+    globalThis.window = previousWindow;
+    globalThis.localStorage = previousStorage;
+  }
 });

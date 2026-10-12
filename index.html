@@ -17,13 +17,14 @@
     />
     <link rel="stylesheet" href="./styles.css" />
     <link rel="stylesheet" href="./styles-fullstack.css" />
+    <link rel="stylesheet" href="./styles-redesign.css?v=20261012-ui2" />
     <link rel="manifest" href="./manifest.webmanifest" />
     <link rel="icon" href="./miyovra-mark.svg" type="image/svg+xml" />
     <meta name="application-name" content="Miyovra" />
     <script defer src="./vendor/hls.min.js"></script>
-    <script type="module" src="./src/app.js?v=20260928-terbium-proxy1"></script>
+    <script type="module" src="./src/app.js?v=20261012-ui2"></script>
     <script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script type="module" src="./src/pages-app.js?v=20261012-auth1"></script>
+    <script type="module" src="./src/pages-app.js?v=20261012-ui2"></script>
   </head>
   <body>
     <header class="site-header">
@@ -32,6 +33,10 @@
           <span class="brand-mark" aria-hidden="true"><img src="./miyovra-mark.svg" alt="" /></span>
           <span>Miyo<span class="brand-accent">vra</span></span>
         </a>
+        <nav class="section-tabs" aria-label="Content sections">
+          <button type="button" class="section-tab active" id="anime-tab" data-section="anime" aria-pressed="true">Anime</button>
+          <button type="button" class="section-tab" id="hentai-tab" data-section="hentai" aria-pressed="false">Hentai <span class="age-badge">18+</span></button>
+        </nav>
         <form class="search" id="search-form" role="search">
           <svg aria-hidden="true" viewBox="0 0 24 24" fill="none">
             <circle
@@ -51,7 +56,7 @@
           <input
             id="search-input"
             type="search"
-            placeholder="Search for an anime..."
+            placeholder="Find your next obsession"
             aria-label="Search anime"
             autocomplete="off"
           />
@@ -67,7 +72,7 @@
               <option value="animeparadise">AnimeParadise</option>
               <option value="animekai">AnimeKai</option>
               <option value="animepahe">Animepahe</option>
-              <option value="hentaiocean" hidden>HentaiOcean · verified</option></select
+              </select
             ><svg aria-hidden="true" viewBox="0 0 12 12" fill="none">
               <path
                 d="m2 4 4 4 4-4"
@@ -116,35 +121,40 @@
     <main>
       <section class="hero" id="hero" aria-labelledby="hero-title">
         <div class="hero-copy">
-          <span class="eyebrow"
-            ><span class="eyebrow-dot"></span> YOUR NEXT OBSESSION STARTS
-            HERE</span
-          >
-          <h1 id="hero-title">A whole world of <em>anime</em> awaits.</h1>
+          <span class="eyebrow"><span class="eyebrow-dot"></span> GOOD STORIES. GREAT ESCAPES.</span>
+          <h1 id="hero-title">Find your next<br /><em>obsession.</em></h1>
           <p>
-            Browse anime you can watch here, explore AniAPI when it is
-            available, and keep your favorites close.
+            One more episode. One whole new world. Discover your next favorite,
+            save your watchlist, and make yourself at home.
           </p>
-          <a class="hero-link" href="#discover"
-            >Explore anime <span aria-hidden="true">↗</span></a
-          >
-        </div>
-        <div class="hero-art" aria-hidden="true">
-          <span class="orbit orbit-one"></span
-          ><span class="orbit orbit-two"></span
-          ><span class="art-star star-one">✦</span
-          ><span class="art-star star-two">✧</span>
-          <div class="art-card art-card-back"></div>
-          <div class="art-card art-card-front">
-            <span class="art-symbol">✦</span>
+          <div class="hero-actions">
+            <a class="hero-link" href="#discover">Explore anime <span aria-hidden="true">↗</span></a>
+            <button type="button" class="hero-secondary" id="surprise-me">Surprise me <span aria-hidden="true">✦</span></button>
           </div>
-          <span class="art-caption">EVERY STORY STARTS SOMEWHERE</span>
+          <div class="hero-footnote"><span class="status-dot"></span> Your world. Your watchlist. Your pace.</div>
+        </div>
+        <div class="hero-art">
+          <div class="hero-orbit" aria-hidden="true"></div>
+          <span class="hero-coordinate" aria-hidden="true">MIYOVRA / DISCOVERY MODE</span>
+          <div class="hero-posters" id="hero-posters">
+            <div class="poster-peek placeholder-poster"><span>01</span><strong>A new<br />perspective.</strong><i aria-hidden="true">✦</i></div>
+            <div class="poster-peek placeholder-poster"><span>02</span><strong>A different<br />world.</strong><i aria-hidden="true">↗</i></div>
+            <div class="poster-peek placeholder-poster"><span>03</span><strong>Your next<br />story.</strong><i aria-hidden="true">◈</i></div>
+          </div>
+          <button class="hero-feature" id="hero-feature" type="button" disabled><span class="feature-play" aria-hidden="true">▶</span><span><small>THE DISCOVERY EDIT</small><strong id="hero-feature-title">Something good is waiting.</strong></span><span aria-hidden="true">↗</span></button>
         </div>
       </section>
 
+      <section class="adult-gate" id="adult-gate" hidden aria-labelledby="gate-title">
+        <div class="gate-symbol" aria-hidden="true">18<span>+</span></div>
+        <div class="gate-copy"><span class="eyebrow">A SEPARATE SPACE</span><h1 id="gate-title">For adult audiences.</h1><p>This section is reserved for adults. Log in and unlock adult access in your account before browsing.</p><div class="hero-actions"><button type="button" class="hero-link" id="adult-unlock">Log in to unlock <span aria-hidden="true">↗</span></button><button type="button" class="hero-secondary" data-section="anime">Back to Anime</button></div></div>
+      </section>
+
+      <div class="catalog-intro"><span id="section-caption">THE ANIME COLLECTION</span><span class="intro-note">Less searching. More watching.</span></div>
+
       <details class="api-settings" id="api-settings">
         <summary>
-          API settings <span>Configure streaming and catalog URLs</span>
+          Source settings <span>Catalogs, streaming & connections</span>
         </summary>
         <form id="api-settings-form">
           <label class="proxy-setting">
@@ -171,7 +181,6 @@
             >HentaiOcean API base URL
             <input id="hentaiocean-url" type="url" value="https://hentaiocean.com" required
           /></label>
-          <p>HentaiOcean is available only to signed-in users who complete the adult verification prompt. Production deployments should pair this with server-side age or identity verification.</p>
           <label class="proxy-setting">
             <span>Proxy engine</span>
             <span class="proxy-toggle">
@@ -348,7 +357,7 @@
       </button>
       <div class="watch-player" hidden>
         <video id="watch-video" controls playsinline preload="none"></video>
-        <iframe id="watch-embed" title="Restricted video player" allowfullscreen hidden></iframe>
+        <iframe id="watch-embed" title="Restricted video player" allow="fullscreen; encrypted-media; picture-in-picture" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen hidden></iframe>
       </div>
       <div class="watch-info">
         <span class="section-kicker" id="watch-provider-label"
@@ -371,7 +380,6 @@
             <option value="animeparadise">AnimeParadise</option>
             <option value="animekai">AnimeKai</option>
             <option value="animepahe">Animepahe</option>
-            <option value="hentaiocean" hidden>HentaiOcean · verified</option>
           </select>
         </label>
         <form id="stream-search-form" class="stream-search" role="search">

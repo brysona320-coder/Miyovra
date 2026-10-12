@@ -1,4 +1,4 @@
-const SHELL_CACHE = "aniwatch-shell-v5";
+const SHELL_CACHE = "miyovra-shell-ui2";
 const MEDIA_CACHE = "aniwatch-media-v2";
 const DB_NAME = "aniwatch-offline";
 const DB_VERSION = 1;
@@ -8,12 +8,16 @@ const SHELL = [
   "./index.html",
   "./styles.css",
   "./styles-fullstack.css",
+  "./styles-redesign.css",
   "./src/api.js",
   "./src/providers.js",
   "./src/streaming.js",
   "./src/app.js",
   "./src/pages-app.js",
   "./src/auth-errors.js",
+  "./src/adult.js",
+  "./src/sections.js",
+  "./src/hentaiocean.js",
   "./vendor/hls.min.js",
   "./manifest.webmanifest"
 ];
@@ -69,7 +73,7 @@ self.addEventListener("fetch", (event) => {
     if (url.origin === self.location.origin) {
       const shell = await caches.open(SHELL_CACHE);
       const cached = await shell.match(request, { ignoreSearch: true });
-      if (cached) {
+      if (cached && !/\.(?:html|js|css)$/.test(url.pathname) && request.mode !== "navigate") {
         event.waitUntil(fetch(request).then((response) => {
           if (response.ok) return shell.put(request, response.clone());
         }).catch(() => {}));
@@ -88,6 +92,11 @@ self.addEventListener("fetch", (event) => {
       }
       return response;
     } catch (error) {
+      if (url.origin === self.location.origin) {
+        const shell = await caches.open(SHELL_CACHE);
+        const fallback = await shell.match(request, { ignoreSearch: true });
+        if (fallback) return fallback;
+      }
       if (request.mode === "navigate") {
         const shell = await caches.open(SHELL_CACHE);
         return (await shell.match("./index.html")) || Response.error();

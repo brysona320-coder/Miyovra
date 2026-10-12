@@ -3,12 +3,20 @@ const KEY = "miyovra:adult-verified";
 export const HENTAI_OCEAN_DEFAULT = "https://hentaiocean.com";
 
 export function signedInUser() {
-  return window.__miyovraUser || null;
+  return globalThis.window?.__miyovraUser || null;
 }
 
 export function isAdultVerified() {
   const user = signedInUser();
-  return Boolean(user?.id && localStorage.getItem(`${KEY}:${user.id}`) === "true");
+  try {
+    return Boolean(user?.id && localStorage.getItem(`${KEY}:${user.id}`) === "true");
+  } catch {
+    return false;
+  }
+}
+
+export function assertAdultAccess() {
+  if (!isAdultVerified()) throw new Error("Log in and unlock adult access in your account to browse Hentai.");
 }
 
 export function verifyAdultAccess() {

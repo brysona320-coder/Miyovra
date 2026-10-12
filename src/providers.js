@@ -1,4 +1,4 @@
-import { fetchJson, safeHttpsUrl, validBaseUrl } from "./api.js?v=20260925-6";
+import { fetchJson, safeHttpsUrl, validBaseUrl } from "./api.js?v=20261012-ui2";
 
 export const ANIAPI_DEFAULT = "https://api.aniapi.com";
 export const ANIMEPARADISE_DEFAULT = "https://api.animeparadise.moe";
@@ -7,6 +7,7 @@ export const PROVIDERS = {
   anilist: { label: "AniList" },
   kitsu: { label: "Kitsu" },
   aniapi: { label: "AniAPI" },
+  hentaiocean: { label: "HentaiOcean" },
 };
 const FORMATS = { tv: 0, movie: 2, special: 3, ova: 4, ona: 5 };
 const FORMAT_NAMES = [

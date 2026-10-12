@@ -1,5 +1,7 @@
 import { RUNTIME_CONFIG } from "./runtime-config.js";
 import { authErrorMessage, isInAppBrowser } from "./auth-errors.js";
+import { isAdultVerified, verifyAdultAccess, revokeAdultAccess } from "./adult.js?v=20261012-ui2";
+import { belongsToSection, sectionItems } from "./sections.js?v=20261012-ui2";
 
 const state = {
   supabase: null,
@@ -261,7 +263,7 @@ function renderAccount() {
     applyProfileTheme();
     loadLists();
     loadContinueWatching();
-    const verified = localStorage.getItem(`miyovra:adult-verified:${state.user.id}`) === "true";
+    const verified = isAdultVerified();
     document.querySelectorAll('option[value="hentaiocean"]').forEach((option) => (option.hidden = !verified));
     if ($("#adult-access-check")) $("#adult-access-check").checked = verified;
     if ($("#adult-access-revoke")) $("#adult-access-revoke").hidden = !verified;
@@ -320,6 +322,7 @@ async function loadLists() {
 
 function selectedAnimePayload() {
   if (!state.anime) return null;
+  if (state.anime.provider === "hentaiocean" && !isAdultVerified()) return null;
   return {
     media_key: state.anime.key,
     provider: state.anime.provider,
@@ -334,8 +337,11 @@ function renderLists() {
   const root = $("#lists-manager");
   if (!root) return;
   root.replaceChildren();
+  if (!state.user) return;
   for (const list of state.lists) {
-    const items = [...(list.list_items || [])].sort((a, b) => new Date(b.added_at) - new Date(a.added_at));
+    const section = document.documentElement.dataset.section || "anime";
+    const items = (section === "hentai" && !isAdultVerified() ? [] : sectionItems(list.list_items || [], section))
+      .sort((a, b) => new Date(b.added_at) - new Date(a.added_at));
     const card = document.createElement("article");
     card.className = "list-manager-card";
     const publicUrl = list.visibility === "PUBLIC"
@@ -355,7 +361,7 @@ function renderLists() {
       ).join("") : "<p>No titles yet.</p>") +
       "</div>";
     const add = $("[data-add]", card);
-    add.disabled = !state.anime;
+    add.disabled = !state.anime || !belongsToSection(state.anime, section) || (section === "hentai" && !isAdultVerified());
     add.addEventListener("click", async () => {
       const payload = selectedAnimePayload();
       if (!payload) return notify("Open an anime first.", true);
@@ -389,9 +395,12 @@ function renderLists() {
 
 async function loadContinueWatching() {
   if (!state.user) return;
+  const userId = state.user.id;
   const result = await state.supabase.from("watch_progress").select("*").eq("user_id", state.user.id).eq("completed", false).order("updated_at", { ascending: false }).limit(50);
+  if (state.user?.id !== userId) return;
   if (result.error) return console.warn(result.error);
-  const items = result.data || [];
+  const section = document.documentElement.dataset.section || "anime";
+  const items = section === "hentai" && !isAdultVerified() ? [] : sectionItems(result.data || [], section);
   $("#continue-watching").hidden = !items.length;
   $("#continue-grid").innerHTML = items.map((item) => {
     const percent = item.duration > 0 ? Math.min(100, Math.round(item.position / item.duration * 100)) : 0;
@@ -584,19 +593,24 @@ function bindUi() {
       $("#adult-access-message").textContent = "Log in before verifying adult access.";
       return;
     }
-    if (event.target.checked) {
-      localStorage.setItem(`miyovra:adult-verified:${state.user.id}`, "true");
-      $("#adult-access-message").textContent = "Adult access is verified for this account on this device.";
-      $("#adult-access-revoke").hidden = false;
-      document.querySelectorAll('option[value="hentaiocean"]').forEach((option) => (option.hidden = false));
+    try {
+      if (event.target.checked) verifyAdultAccess();
+      else revokeAdultAccess();
+      $("#adult-access-message").textContent = event.target.checked ? "Adult access is unlocked for this account on this device." : "Adult access is locked.";
+      $("#adult-access-revoke").hidden = !event.target.checked;
+      window.dispatchEvent(new CustomEvent("miyovra:access-changed"));
+    } catch (error) {
+      event.target.checked = false;
+      $("#adult-access-message").textContent = error.message;
     }
   });
   $("#adult-access-revoke").addEventListener("click", () => {
-    if (state.user) localStorage.removeItem(`miyovra:adult-verified:${state.user.id}`);
+    revokeAdultAccess();
     $("#adult-access-check").checked = false;
     $("#adult-access-revoke").hidden = true;
     $("#adult-access-message").textContent = "Adult access revoked.";
     document.querySelectorAll('option[value="hentaiocean"]').forEach((option) => (option.hidden = true));
+    window.dispatchEvent(new CustomEvent("miyovra:access-changed"));
   });
   document.querySelectorAll("[data-auth]").forEach((button) => button.addEventListener("click", () => setAuthMode(button.dataset.auth)));
   document.querySelectorAll("[data-page]").forEach((button) => button.addEventListener("click", () => showPanel(button.dataset.page)));
@@ -750,6 +764,25 @@ function bindUi() {
 }
 
 function bindAppEvents() {
+  window.addEventListener("miyovra:section-changed", () => {
+    state.anime = null;
+    $("#continue-watching").hidden = true;
+    renderLists();
+    if (state.user) loadContinueWatching();
+  });
+  window.addEventListener("miyovra:access-changed", () => {
+    if (!isAdultVerified() && state.anime?.provider === "hentaiocean") state.anime = null;
+    $("#continue-watching").hidden = true;
+    renderLists();
+    if (state.user) loadContinueWatching();
+  });
+  window.addEventListener("aniwatch:episode-cleared", () => {
+    state.sources = [];
+    state.media = null;
+    $("#player-tools").hidden = false;
+    $("#download-current").disabled = true;
+    $("#player-download").disabled = true;
+  });
   window.addEventListener("aniwatch:anime-selected", (event) => {
     state.anime = event.detail?.anime || null;
     if (state.user) loadLists();
@@ -758,6 +791,13 @@ function bindAppEvents() {
     const detail = event.detail || {};
     state.anime = detail.anime || state.anime;
     state.sources = detail.sources || [];
+    $("#player-tools").hidden = Boolean(detail.embed);
+    if (detail.embed) {
+      state.media = null;
+      $("#download-current").disabled = true;
+      $("#player-download").disabled = true;
+      return;
+    }
     state.media = {
       media_key: mediaKey(detail),
       provider: detail.provider || "unknown",
@@ -789,6 +829,8 @@ async function showPublicList() {
     state.supabase.from("profiles").select("display_name").eq("id", userId).maybeSingle()
   ]);
   if (itemsResult.error) return;
+  const section = document.documentElement.dataset.section || "anime";
+  const visibleItems = section === "hentai" && !isAdultVerified() ? [] : sectionItems(itemsResult.data || [], section);
   $("#account-dialog").showModal();
   $(".account-nav").hidden = true;
   $("#auth-view").hidden = true;
@@ -797,7 +839,7 @@ async function showPublicList() {
     "<section><h3>" + escapeHtml(listResult.data.name) + "</h3><p>Shared by " +
     escapeHtml(ownerResult.data?.display_name || "Miyovra user") +
     '</p><div class="public-list-grid">' +
-    ((itemsResult.data || []).map((item) => "<article><strong>" + escapeHtml(item.title) + "</strong></article>").join("") || "<p>This list is empty.</p>") +
+    (visibleItems.map((item) => "<article><strong>" + escapeHtml(item.title) + "</strong></article>").join("") || "<p>No titles in this section.</p>") +
     "</div></section>";
 }
 

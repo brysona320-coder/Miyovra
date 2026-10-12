@@ -2,7 +2,9 @@
 
 Miyovra is a static anime frontend hosted on **GitHub Pages**.
 
-HentaiOcean is an optional restricted streaming source. It is only exposed to signed-in users who complete the adult verification prompt in their Miyovra account panel, and playback uses HentaiOcean's documented embed API. The browser gate is a product access control; production deployments should add server-side age or identity verification.
+The **Anime** and **Hentai · 18+** tabs have separate catalogs, search queries, watchlists, and Continue Watching views. Anime uses the existing catalog sources. Hentai uses HentaiOcean's RSS feed and documented embed player; it stays locked until a signed-in user enables adult access in their Miyovra account panel. Revoking access or logging out closes restricted playback. The existing age prompt is browser-local self-attestation; production age or identity verification still requires a server-backed provider.
+
+The interface includes a cinematic featured-title area, interactive poster cards, a surprise pick, responsive layouts, light/dark themes, and reduced-motion support.
 
 Features include email/password accounts through Supabase, profile avatars, Continue Watching sync, public/private lists, player customization, and browser offline downloads.
 
@@ -89,3 +91,11 @@ The Service Worker stores supported media in browser Cache Storage and tracks do
 ```sh
 npm test
 ```
+
+For a local design preview with synthetic catalogs and a mocked account service:
+
+```sh
+npm run preview:fixtures
+```
+
+Open `http://127.0.0.1:8765/`. This preview creates no real accounts, sends no emails, and plays no external media. Preview tooling and tests are excluded from the Pages deployment.

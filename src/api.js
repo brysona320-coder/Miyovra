@@ -54,7 +54,7 @@ function proxyTargetUrl(targetUrl) {
     : targetUrl;
 }
 
-export async function fetchJson(baseUrl, path, signal, requestOptions = {}) {
+async function fetchResponse(baseUrl, path, signal, requestOptions = {}) {
   const base = validBaseUrl(baseUrl);
   if (!base) throw new Error("Enter a valid HTTPS API URL in API settings.");
   let response;
@@ -90,6 +90,18 @@ export async function fetchJson(baseUrl, path, signal, requestOptions = {}) {
       throw new Error("The API is rate limited. Try again shortly.");
     throw new Error(`The API returned HTTP ${response.status}.`);
   }
+  return response;
+}
+
+export async function fetchText(baseUrl, path, signal) {
+  const response = await fetchResponse(baseUrl, path, signal, {
+    headers: { Accept: "application/rss+xml, application/xml, text/xml" },
+  });
+  return response.text();
+}
+
+export async function fetchJson(baseUrl, path, signal, requestOptions = {}) {
+  const response = await fetchResponse(baseUrl, path, signal, requestOptions);
   try {
     return await response.json();
   } catch {

@@ -3,13 +3,13 @@ import {
   ANIAPI_DEFAULT,
   ANIMEPARADISE_DEFAULT,
   PROVIDERS,
-} from "./providers.js?v=20260925-6";
+} from "./providers.js?v=20261012-ui2";
 import {
   validBaseUrl,
   validProxyTemplate,
   setApiProxyTemplate,
   setScramjetProxy,
-} from "./api.js?v=20260928-scramjet-wisp2";
+} from "./api.js?v=20261012-ui2";
 import {
   CONSUMET_DEFAULT,
   STREAM_PROVIDERS,
@@ -17,8 +17,10 @@ import {
   getStreamInfo,
   getEpisodeSources,
   HENTAI_OCEAN_DEFAULT,
-} from "./streaming.js?v=20260925-6";
-import { isAdultVerified } from "./adult.js?v=20261012-adult1";
+} from "./streaming.js?v=20261012-ui2";
+import { isAdultVerified, signedInUser } from "./adult.js?v=20261012-ui2";
+import { fetchOceanCatalog } from "./hentaiocean.js?v=20261012-ui2";
+import { sectionItems } from "./sections.js?v=20261012-ui2";
 
 const STORAGE = {
   favorites: "aniwatch:favorites",
@@ -102,6 +104,13 @@ const elements = {
   streamEpisodes: $("#stream-episodes"),
   moreEpisodes: $("#more-episodes"),
   quality: $("#quality-select"),
+  adultGate: $("#adult-gate"),
+  adultUnlock: $("#adult-unlock"),
+  sectionCaption: $("#section-caption"),
+  heroPosters: $("#hero-posters"),
+  heroFeature: $("#hero-feature"),
+  heroFeatureTitle: $("#hero-feature-title"),
+  surprise: $("#surprise-me"),
 };
 
 function readStorage(key, fallback) {
@@ -136,6 +145,8 @@ const favorites = new Map(
 const savedProvider = readStorage(STORAGE.streamProvider, "animeparadise");
 const savedCatalog = readStorage(STORAGE.catalogProvider, "animeparadise");
 const state = {
+  section: "anime",
+  sectionQueries: { anime: "", hentai: "" },
   streamProvider: STREAM_PROVIDERS[savedProvider]
     ? savedProvider
     : "animeparadise",
@@ -175,6 +186,7 @@ const state = {
   streamRequestId: 0,
   videoSources: [],
 };
+if (state.catalogProvider === "hentaiocean") state.catalogProvider = "animeparadise";
 if (state.catalogProvider === "aniapi" && state.aniapiUrl === ANIAPI_DEFAULT)
   state.catalogProvider = "animeparadise";
 if (
@@ -182,8 +194,10 @@ if (
   state.consumetUrl === CONSUMET_DEFAULT
 )
   state.streamProvider = "animeparadise";
-if (state.streamProvider === "hentaiocean" && !isAdultVerified()) state.streamProvider = "animeparadise";
+if (state.streamProvider === "hentaiocean") state.streamProvider = "animeparadise";
+state.animeStreamProvider = state.streamProvider;
 let hlsPlayer = null;
+let featuredAnime = null;
 
 function terbiumWispUrl(baseUrl) {
   const base = validBaseUrl(baseUrl);
@@ -237,8 +251,10 @@ function syncApiPreset() {
 function applyApiPreset(name) {
   const preset = API_PRESETS[name];
   if (!preset) return;
+  if (state.section === "hentai") setSection("anime");
   state.catalogProvider = preset.catalog;
   state.streamProvider = preset.stream;
+  state.animeStreamProvider = preset.stream;
   state.animeparadiseUrl = preset.animeparadiseUrl;
   state.consumetUrl = preset.consumetUrl;
   elements.catalogProvider.value = state.catalogProvider;
@@ -314,11 +330,9 @@ function setTheme(theme) {
   writeStorage(STORAGE.theme, theme);
 }
 function clearStream() {
-  hlsPlayer?.destroy();
-  hlsPlayer = null;
-  elements.watchVideo.pause();
-  elements.watchVideo.removeAttribute("src");
-  elements.watchVideo.load();
+  clearVideoOnly();
+  state.videoSources = [];
+  window.dispatchEvent(new CustomEvent("aniwatch:episode-cleared"));
   elements.watchPlayer.hidden = true;
   elements.quality.replaceChildren(new Option("Choose an episode", ""));
   elements.quality.disabled = true;
@@ -336,7 +350,7 @@ function nextStreamRequest() {
 function watchFailure(error, id) {
   if (id !== state.streamRequestId || error.name === "AbortError") return;
   elements.watchError.textContent =
-    state.streamProvider !== "animeparadise" &&
+    state.streamProvider !== "animeparadise" && state.streamProvider !== "hentaiocean" &&
     state.consumetUrl === CONSUMET_DEFAULT
       ? "The public Consumet API is unavailable. Choose AnimeParadise or enter a working Consumet URL in API settings."
       : error.message || "Could not load this stream.";
@@ -344,6 +358,8 @@ function watchFailure(error, id) {
     "Check the API settings or choose another streaming source.";
 }
 function openWatch(anime) {
+  if (anime.provider === "hentaiocean" && !isAdultVerified()) return showRestrictedGate();
+  state.streamProvider = anime.provider === "hentaiocean" ? "hentaiocean" : state.animeStreamProvider;
   closeDetails();
   state.watchAnime = anime;
   state.streamId = "";
@@ -355,8 +371,8 @@ function openWatch(anime) {
   elements.watchDialog.showModal();
   elements.streamMatches.replaceChildren();
   if (
-    anime.provider === "animeparadise" &&
-    state.streamProvider === "animeparadise"
+    anime.provider === "hentaiocean" || (anime.provider === "animeparadise" &&
+    state.streamProvider === "animeparadise")
   )
     selectStream({ id: anime.id, title: anime.title, url: anime.url });
   else searchWatch();
@@ -381,16 +397,6 @@ async function searchWatch() {
       signal: request.signal,
     });
     if (request.id !== state.streamRequestId) return;
-    if (result.embed) {
-      elements.watchVideo.hidden = true;
-      elements.watchEmbed.hidden = false;
-      elements.watchEmbed.src = result.embed;
-      elements.quality.replaceChildren(new Option("Embedded player", "0"));
-      elements.quality.disabled = true;
-      elements.streamEpisodes.querySelectorAll("button").forEach((item) => item.classList.toggle("active", item === button));
-      elements.watchDescription.textContent = `${state.streamTitle} · Episode ${episode.number}`;
-      return;
-    }
     elements.watchDescription.textContent = matches.length
       ? "Choose the matching series to see its episodes."
       : "No matching series found. Try the other streaming source.";
@@ -479,7 +485,7 @@ async function selectEpisode(episode, button) {
       signal: request.signal,
     });
     if (request.id !== state.streamRequestId) return;
-    if (!result.sources.length)
+    if (!result.embed && !result.sources.length)
       throw new Error("No browser-playable video sources were returned.");
     state.videoSources = result.sources;
     window.dispatchEvent(new CustomEvent("aniwatch:episode-selected", {
@@ -489,12 +495,24 @@ async function selectEpisode(episode, button) {
         streamId: state.streamId,
         streamTitle: state.streamTitle,
         episode,
-        sources: result.sources
+        sources: result.sources,
+        embed: Boolean(result.embed),
       }
     }));
     elements.streamEpisodes
       .querySelectorAll("button")
       .forEach((item) => item.classList.toggle("active", item === button));
+    if (result.embed) {
+      if (!isAdultVerified()) return showRestrictedGate();
+      elements.watchPlayer.hidden = false;
+      elements.watchVideo.hidden = true;
+      elements.watchEmbed.hidden = false;
+      elements.watchEmbed.src = result.embed;
+      elements.quality.replaceChildren(new Option("Use the embedded player controls", ""));
+      elements.quality.disabled = true;
+      elements.watchDescription.textContent = `${state.streamTitle} · Official HentaiOcean player`;
+      return;
+    }
     elements.quality.replaceChildren(
       ...result.sources.map(
         (source, index) => new Option(source.quality, String(index)),
@@ -558,20 +576,95 @@ function clearVideoOnly() {
 }
 function updateWatchlistControls() {
   elements.watchlist.setAttribute("aria-pressed", String(state.watchlist));
-  elements.watchlistCount.textContent = String(favorites.size);
+  elements.watchlistCount.textContent = String(sectionItems([...favorites.values()], state.section).length);
   elements.dialogFavorite.textContent =
     state.selected && favorites.has(state.selected.key)
       ? "♥ In watchlist"
       : "♡ Add to watchlist";
 }
+
+function showRestrictedGate() {
+  state.controller?.abort();
+  state.requestId++;
+  state.items = [];
+  state.busy = false;
+  state.hasMore = false;
+  closeDetails();
+  closeStream();
+  clearStream();
+  elements.grid.replaceChildren();
+  elements.pageError.textContent = "";
+  elements.catalogNotice.hidden = true;
+  updateHeading();
+}
+
+function setSection(section) {
+  if (!["anime", "hentai"].includes(section)) return;
+  clearTimeout(searchTimer);
+  state.sectionQueries[state.section] = state.query;
+  state.section = section;
+  state.query = state.sectionQueries[section];
+  elements.search.value = state.query;
+  document.documentElement.dataset.section = section;
+  state.streamProvider = section === "hentai" ? "hentaiocean" : state.animeStreamProvider;
+  elements.provider.value = state.animeStreamProvider;
+  elements.watchProvider.value = state.animeStreamProvider;
+  state.watchlist = false;
+  closeDetails();
+  closeStream();
+  clearStream();
+  document.querySelectorAll("button[data-section]").forEach((button) => {
+    const active = button.dataset.section === section;
+    button.classList.toggle("active", active);
+    button.setAttribute("aria-pressed", String(active));
+  });
+  window.dispatchEvent(new CustomEvent("miyovra:section-changed", { detail: { section } }));
+  startCatalog();
+}
+
+function updateHero() {
+  if (state.section !== "anime" || state.watchlist || state.query) return;
+  const items = state.items.filter((item) => item.image).slice(0, 3);
+  if (!items.length) return;
+  featuredAnime = items[0];
+  elements.heroFeature.disabled = false;
+  elements.heroFeatureTitle.textContent = featuredAnime.title;
+  elements.heroPosters.replaceChildren(...items.map((anime, index) => {
+    const poster = document.createElement("button");
+    poster.type = "button";
+    poster.className = "poster-peek";
+    poster.setAttribute("aria-label", `Discover ${anime.title}`);
+    const image = document.createElement("img");
+    image.src = anime.image;
+    image.alt = "";
+    const title = document.createElement("span");
+    title.className = "peek-caption";
+    title.textContent = `${String(index + 1).padStart(2, "0")} / ${anime.title}`;
+    poster.append(image, title);
+    poster.addEventListener("click", () => openDetails(anime));
+    return poster;
+  }));
+}
+
 function updateHeading() {
+  const adult = state.section === "hentai";
+  const locked = adult && !isAdultVerified();
+  elements.adultGate.hidden = !locked;
+  elements.grid.hidden = locked;
+  elements.adultUnlock.firstChild.textContent = signedInUser() ? "Unlock in your account " : "Log in to unlock ";
+  elements.sectionCaption.textContent = adult ? "THE HENTAI COLLECTION / 18+" : "THE ANIME COLLECTION";
+  elements.search.placeholder = adult ? "Search HentaiOcean titles or paste a watch URL" : "Find your next obsession";
+  elements.search.setAttribute("aria-label", adult ? "Search Hentai" : "Search anime");
+  elements.search.disabled = locked;
+  $(".provider-control").hidden = adult;
+  $(".watch-provider-control").hidden = adult;
+  elements.settings.hidden = locked;
+  $("#discover").hidden = locked;
   const title = state.watchlist
     ? "Your watchlist"
     : state.query
       ? `Results for “${state.query}”`
-      : state.catalogProvider === "animeparadise"
-        ? "Watchable anime"
-        : "Top rated anime";
+      : adult ? "Explore Hentai" : "Worth the watch";
   elements.heading.replaceChildren(
     document.createTextNode(title),
     Object.assign(document.createElement("span"), {
@@ -580,7 +673,8 @@ function updateHeading() {
     }),
   );
   elements.subtitle.textContent = state.watchlist
-    ? "The stories you saved, all in one place."
+    ? `Your saved ${adult ? "Hentai" : "Anime"} titles. Ready when you are.`
+    : adult ? "The latest from HentaiOcean, in your own adult collection."
     : state.query
       ? `Explore matches from ${PROVIDERS[state.catalogProvider].label}.`
       : state.catalogProvider === "animeparadise"
@@ -590,20 +684,20 @@ function updateHeading() {
     ? "WATCHLIST"
     : state.query
       ? "SEARCH"
-      : state.catalogProvider === "animeparadise"
+      : adult ? "LATEST RELEASES" : state.catalogProvider === "animeparadise"
         ? "WATCHABLE"
         : "TOP RATED";
   elements.source.textContent = state.watchlist
     ? "SAVED IN THIS BROWSER"
-    : `POWERED BY ${PROVIDERS[state.catalogProvider].label.toUpperCase()}`;
-  elements.hero.hidden = state.watchlist || Boolean(state.query);
+    : `POWERED BY ${adult ? "HENTAIOCEAN" : PROVIDERS[state.catalogProvider].label.toUpperCase()}`;
+  elements.hero.hidden = adult || state.watchlist || Boolean(state.query);
   elements.filters.hidden =
-    state.watchlist || state.catalogProvider === "animeparadise";
-  elements.catalogControl.hidden = state.watchlist;
+    adult || state.watchlist || state.catalogProvider === "animeparadise";
+  elements.catalogControl.hidden = adult || state.watchlist;
   elements.count.textContent = state.items.length
     ? `${state.items.length} titles`
     : "";
-  elements.loadMore.hidden = state.watchlist || !state.hasMore;
+  elements.loadMore.hidden = locked || state.watchlist || !state.hasMore;
   elements.loadMore.disabled = state.busy;
 }
 function showSkeletons() {
@@ -655,7 +749,16 @@ function createCard(anime, index) {
     cover.append(image);
   } else {
     cover.classList.add("cover-placeholder");
-    cover.textContent = "✦";
+    if (anime.provider === "hentaiocean") {
+      cover.classList.add("adult-cover");
+      const monogram = document.createElement("span");
+      monogram.className = "cover-monogram";
+      monogram.textContent = anime.title.slice(0, 1).toLocaleUpperCase();
+      const label = document.createElement("span");
+      label.className = "cover-caption";
+      label.textContent = anime.title;
+      cover.append(monogram, label);
+    } else cover.textContent = "✦";
   }
   if (!state.watchlist && !state.query) {
     const rank = document.createElement("span");
@@ -723,8 +826,10 @@ function renderItems() {
     elements.grid.append(fragment);
   }
   updateHeading();
+  updateHero();
 }
 async function loadPage(reset = false) {
+  if (state.section === "hentai" && !isAdultVerified()) return showRestrictedGate();
   if (state.watchlist || (state.busy && !reset)) return;
   state.controller?.abort();
   const controller = new AbortController();
@@ -743,7 +848,9 @@ async function loadPage(reset = false) {
   updateHeading();
   try {
     const fetchPage = (provider, baseUrl) =>
-      fetchAnime({
+      state.section === "hentai" ? fetchOceanCatalog({
+        baseUrl: state.hentaiOceanUrl, query: state.query, page: nextPage, signal: controller.signal,
+      }) : fetchAnime({
         provider,
         baseUrl:
           provider === "animeparadise"
@@ -765,6 +872,7 @@ async function loadPage(reset = false) {
     } catch (error) {
       if (
         error.name === "AbortError" ||
+        state.section === "hentai" ||
         !reset ||
         state.catalogProvider !== "animeparadise"
       )
@@ -839,6 +947,7 @@ function startCatalog() {
   loadPage(true);
 }
 function showWatchlist() {
+  if (state.section === "hentai" && !isAdultVerified()) return showRestrictedGate();
   state.controller?.abort();
   state.requestId++;
   state.busy = false;
@@ -846,7 +955,7 @@ function showWatchlist() {
   elements.catalogNotice.hidden = true;
   state.watchlist = true;
   state.hasMore = false;
-  state.items = [...favorites.values()];
+  state.items = sectionItems([...favorites.values()], state.section, state.query);
   updateWatchlistControls();
   renderItems();
 }
@@ -856,15 +965,18 @@ function toggleFavorite(anime) {
   writeStorage(STORAGE.favorites, [...favorites.values()]);
   updateWatchlistControls();
   if (state.watchlist) {
-    state.items = [...favorites.values()];
+    state.items = sectionItems([...favorites.values()], state.section, state.query);
     renderItems();
   } else renderItems();
 }
 function openDetails(anime) {
+  if (anime.provider === "hentaiocean" && !isAdultVerified()) return showRestrictedGate();
   state.selected = anime;
   window.dispatchEvent(new CustomEvent("aniwatch:anime-selected", { detail: { anime } }));
   elements.dialogImage.src = anime.image || "";
   elements.dialogImage.alt = anime.image ? `Cover art for ${anime.title}` : "";
+  elements.dialogImage.hidden = !anime.image;
+  $(".dialog-poster").classList.toggle("adult-cover", anime.provider === "hentaiocean");
   elements.dialogProvider.textContent = `FROM ${PROVIDERS[anime.provider].label.toUpperCase()}`;
   elements.dialogTitle.textContent = anime.title;
   elements.dialogDescription.textContent =
@@ -884,8 +996,9 @@ function openDetails(anime) {
   }
   elements.dialogSource.href = anime.url;
   elements.dialogWatch.textContent =
-    anime.provider === "animeparadise" &&
+    anime.provider === "hentaiocean" || (anime.provider === "animeparadise" &&
     state.streamProvider === "animeparadise"
+    )
       ? "▶ Watch episodes"
       : "▶ Find episodes";
   elements.dialogTrailer.replaceChildren();
@@ -929,12 +1042,17 @@ elements.search.addEventListener("input", () => {
   }, 500);
 });
 function setStreamProvider(provider) {
+  if (state.section === "hentai" && provider !== "hentaiocean") {
+    elements.watchProvider.value = state.animeStreamProvider;
+    return;
+  }
   if (provider === "hentaiocean" && !isAdultVerified()) {
     elements.provider.value = state.streamProvider;
     document.querySelector("#account-button")?.click();
     return;
   }
   state.streamProvider = provider;
+  if (provider !== "hentaiocean") state.animeStreamProvider = provider;
   elements.provider.value = provider;
   elements.watchProvider.value = provider;
   writeStorage(STORAGE.streamProvider, state.streamProvider);
@@ -1013,13 +1131,14 @@ elements.settingsForm.addEventListener("submit", (event) => {
   const aniapiUrl = validBaseUrl(elements.aniapiUrl.value.trim());
   const consumetUrl = validBaseUrl(elements.consumetUrl.value.trim());
   const animeparadiseUrl = validBaseUrl(elements.animeparadiseUrl.value.trim());
-  const hentaiOceanUrl = validBaseUrl(elements.hentaiOceanUrl.value.trim()) || HENTAI_OCEAN_DEFAULT;
+  const hentaiOceanUrl = validBaseUrl(elements.hentaiOceanUrl.value.trim());
   if (!aniapiUrl || !consumetUrl || !animeparadiseUrl || !hentaiOceanUrl) {
     elements.settingsMessage.textContent =
       "Use HTTPS URLs, or local HTTP URLs during development.";
     return;
   }
   const catalogChanged =
+    (state.section === "hentai" && state.hentaiOceanUrl !== hentaiOceanUrl) ||
     (state.catalogProvider === "aniapi" && state.aniapiUrl !== aniapiUrl) ||
     (state.catalogProvider === "animeparadise" &&
       state.animeparadiseUrl !== animeparadiseUrl);
@@ -1098,7 +1217,8 @@ elements.home.addEventListener("click", (event) => {
     item.classList.toggle("active", active);
     item.setAttribute("aria-pressed", String(active));
   });
-  startCatalog();
+  state.sectionQueries.anime = "";
+  setSection("anime");
   window.scrollTo({ top: 0, behavior: "smooth" });
 });
 elements.dialogClose.addEventListener("click", closeDetails);
@@ -1143,6 +1263,33 @@ elements.watchVideo.addEventListener("error", () => {
 elements.watchVideo.addEventListener("playing", () => {
   elements.watchError.textContent = "";
 });
+
+document.querySelectorAll("button[data-section]").forEach((button) => {
+  button.addEventListener("click", () => setSection(button.dataset.section));
+});
+elements.adultUnlock.addEventListener("click", () => $("#account-button")?.click());
+elements.surprise.addEventListener("click", () => {
+  if (state.items.length) openDetails(state.items[Math.floor(Math.random() * state.items.length)]);
+});
+elements.heroFeature.addEventListener("click", () => {
+  if (featuredAnime) openDetails(featuredAnime);
+});
+function syncAccess() {
+  if (!isAdultVerified()) {
+    if (state.streamProvider === "hentaiocean") {
+      state.streamController?.abort();
+      state.streamRequestId++;
+      closeStream();
+      clearStream();
+    }
+    if (state.section === "hentai") showRestrictedGate();
+  } else if (state.section === "hentai") {
+    state.watchlist ? showWatchlist() : startCatalog();
+  }
+  updateHeading();
+}
+window.addEventListener("miyovra-auth-changed", syncAccess);
+window.addEventListener("miyovra:access-changed", syncAccess);
 
 elements.provider.value = state.streamProvider;
 elements.catalogProvider.value = state.catalogProvider;
