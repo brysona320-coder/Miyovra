@@ -18,6 +18,7 @@
     <link rel="stylesheet" href="./styles.css" />
     <link rel="stylesheet" href="./styles-fullstack.css" />
     <link rel="stylesheet" href="./styles-redesign.css?v=20261012-ui2" />
+    <link rel="stylesheet" href="./styles-cosmos.css?v=20261012-cosmos1" />
     <link rel="manifest" href="./manifest.webmanifest" />
     <link rel="icon" href="./miyovra-mark.svg" type="image/svg+xml" />
     <meta name="application-name" content="Miyovra" />
@@ -25,8 +26,13 @@
     <script type="module" src="./src/app.js?v=20261012-ui2"></script>
     <script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script type="module" src="./src/pages-app.js?v=20261012-ui2"></script>
+    <script type="module" src="./src/cosmic-ui.js?v=20261012-cosmos1"></script>
   </head>
   <body>
+    <div class="cosmos-backdrop" aria-hidden="true">
+      <div class="nebula-layer nebula-orion"></div><div class="nebula-layer nebula-crab"></div><div class="nebula-layer nebula-helix"></div>
+      <canvas id="cosmos-canvas"></canvas><div class="cosmos-vignette"></div>
+    </div>
     <header class="site-header">
       <div class="header-inner">
         <a class="brand" href="./" id="home-link" aria-label="Miyovra home">
@@ -132,6 +138,7 @@
             <button type="button" class="hero-secondary" id="surprise-me">Surprise me <span aria-hidden="true">✦</span></button>
           </div>
           <div class="hero-footnote"><span class="status-dot"></span> Your world. Your watchlist. Your pace.</div>
+          <button type="button" class="hero-cosmic-link" data-open-sky="orion">Take a detour through the stars <span aria-hidden="true">✧ ↗</span></button>
         </div>
         <div class="hero-art">
           <div class="hero-orbit" aria-hidden="true"></div>
@@ -142,6 +149,15 @@
             <div class="poster-peek placeholder-poster"><span>03</span><strong>Your next<br />story.</strong><i aria-hidden="true">◈</i></div>
           </div>
           <button class="hero-feature" id="hero-feature" type="button" disabled><span class="feature-play" aria-hidden="true">▶</span><span><small>THE DISCOVERY EDIT</small><strong id="hero-feature-title">Something good is waiting.</strong></span><span aria-hidden="true">↗</span></button>
+        </div>
+      </section>
+
+      <section class="cosmic-invitation" aria-label="Explore nebulae and constellations">
+        <div><span class="cosmic-overline">BEYOND THE NEXT EPISODE</span><h2>A little space to get lost.</h2><button type="button" class="constellation-shortcut" data-open-sky="orion"><span data-sky-preview="orion" aria-hidden="true"></span><span>Trace Orion <i aria-hidden="true">↗</i></span></button></div>
+        <div class="nebula-destinations">
+          <button type="button" class="nebula-destination" data-open-sky="orion-nebula"><span class="nebula-swatch swatch-orion" aria-hidden="true"></span><span><small>M42 / STAR BIRTH</small>Orion Nebula</span><i aria-hidden="true">↗</i></button>
+          <button type="button" class="nebula-destination" data-open-sky="crab-nebula"><span class="nebula-swatch swatch-crab" aria-hidden="true"></span><span><small>M1 / AFTER THE EXPLOSION</small>Crab Nebula</span><i aria-hidden="true">↗</i></button>
+          <button type="button" class="nebula-destination" data-open-sky="helix-nebula"><span class="nebula-swatch swatch-helix" aria-hidden="true"></span><span><small>A STAR’S LAST CHAPTER</small>Helix Nebula</span><i aria-hidden="true">↗</i></button>
         </div>
       </section>
 
@@ -341,6 +357,24 @@
         sources.</span
       >
     </footer>
+
+    <aside class="cosmos-controls" aria-label="Cosmic atmosphere controls">
+      <button type="button" class="cosmos-explore" data-open-sky="orion"><span aria-hidden="true">✦</span> Explore sky</button>
+      <span class="cosmos-control-divider" aria-hidden="true"></span>
+      <button type="button" id="cosmos-pause" aria-pressed="false">Pause stars</button>
+    </aside>
+
+    <dialog id="sky-dialog" class="sky-dialog" aria-labelledby="sky-title">
+      <div class="sky-atmosphere" aria-hidden="true"><div class="nebula-layer nebula-orion"></div><div class="nebula-layer nebula-crab"></div><div class="nebula-layer nebula-helix"></div><canvas id="sky-canvas"></canvas></div>
+      <div class="sky-shell">
+        <header class="sky-header"><div><span class="cosmic-overline"><span class="observatory-dot" aria-hidden="true"></span> THE MIYOVRA OBSERVATORY</span><h2 id="sky-title">Stay a little.<br /><em>Look up.</em></h2></div><button type="button" id="sky-close" class="sky-close" aria-label="Close sky explorer">Back to Miyovra <span aria-hidden="true">×</span></button></header>
+        <div class="sky-layout">
+          <div class="sky-map-wrap"><p class="sky-instruction">Click a constellation or glowing nebula to discover its story.</p><div class="sky-chart" id="sky-chart" aria-label="Illustrative interactive sky"><div class="sky-grid" aria-hidden="true"></div></div><div class="sky-map-footer"><span>ILLUSTRATIVE PATTERNS / NOT A LIVE SKY MAP</span><div class="sky-motion-actions"><button type="button" id="sky-pause" aria-pressed="false">Pause stars</button><button type="button" id="sky-shower" aria-pressed="false"><span aria-hidden="true">☄</span> Meteor shower</button></div></div></div>
+          <aside class="sky-info" id="sky-info" aria-live="polite" aria-atomic="true"></aside>
+        </div>
+        <footer class="sky-footer"><span>Small stars. Enormous stories.</span><span>Explore with a mouse, touch, or Tab + Enter.</span></footer>
+      </div>
+    </dialog>
 
     <dialog
       id="watch-dialog"

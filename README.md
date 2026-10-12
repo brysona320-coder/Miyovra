@@ -6,6 +6,8 @@ The **Anime** and **Hentai · 18+** tabs have separate catalogs, search queries,
 
 The interface includes a cinematic featured-title area, interactive poster cards, a surprise pick, responsive layouts, light/dark themes, and reduced-motion support.
 
+The cosmic atmosphere adds gently drifting nebulae, twinkling stars, meteor rain, and pointer parallax. **Explore sky** opens an interactive observatory with four constellation patterns, three nebulae, and NASA-linked information cards. Selecting a nebula changes the ambient colors; **Meteor shower** increases the star rain. **Pause stars** saves your motion preference on this browser. Effects stop during episode playback, in hidden tabs, and when the device requests reduced motion. The star patterns and nebula visuals are illustrations, not a live sky map or telescope photographs.
+
 Features include email/password accounts through Supabase, profile avatars, Continue Watching sync, public/private lists, player customization, and browser offline downloads.
 
 ## Monetization

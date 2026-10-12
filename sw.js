@@ -1,4 +1,4 @@
-const SHELL_CACHE = "miyovra-shell-ui2";
+const SHELL_CACHE = "miyovra-shell-cosmos1";
 const MEDIA_CACHE = "aniwatch-media-v2";
 const DB_NAME = "aniwatch-offline";
 const DB_VERSION = 1;
@@ -9,6 +9,7 @@ const SHELL = [
   "./styles.css",
   "./styles-fullstack.css",
   "./styles-redesign.css",
+  "./styles-cosmos.css",
   "./src/api.js",
   "./src/providers.js",
   "./src/streaming.js",
@@ -18,6 +19,9 @@ const SHELL = [
   "./src/adult.js",
   "./src/sections.js",
   "./src/hentaiocean.js",
+  "./src/cosmic-data.js",
+  "./src/cosmic-scene.js",
+  "./src/cosmic-ui.js",
   "./vendor/hls.min.js",
   "./manifest.webmanifest"
 ];
