@@ -1,4 +1,4 @@
-const SHELL_CACHE = "aniwatch-shell-v4";
+const SHELL_CACHE = "aniwatch-shell-v5";
 const MEDIA_CACHE = "aniwatch-media-v2";
 const DB_NAME = "aniwatch-offline";
 const DB_VERSION = 1;
@@ -13,6 +13,7 @@ const SHELL = [
   "./src/streaming.js",
   "./src/app.js",
   "./src/pages-app.js",
+  "./src/auth-errors.js",
   "./vendor/hls.min.js",
   "./manifest.webmanifest"
 ];
