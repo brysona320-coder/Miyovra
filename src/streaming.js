@@ -2,11 +2,13 @@ import { fetchJson, safeHttpsUrl } from "./api.js?v=20260925-6";
 
 export const CONSUMET_DEFAULT = "https://api.consumet.org";
 export const ANIMEPARADISE_DEFAULT = "https://api.animeparadise.moe";
+export const HENTAI_OCEAN_DEFAULT = "https://hentaiocean.com";
 const ANIMEPARADISE_STREAM = "https://stream.animeparadise.moe";
 export const STREAM_PROVIDERS = {
   animeparadise: "AnimeParadise",
   animekai: "AnimeKai",
   animepahe: "Animepahe",
+  hentaiocean: "HentaiOcean · verified",
 };
 
 function checkProvider(provider) {
@@ -53,6 +55,12 @@ export async function searchStreams({ baseUrl, provider, query, signal }) {
       }))
       .sort((a, b) => matchRank(a.title, query) - matchRank(b.title, query));
   }
+  if (provider === "hentaiocean") {
+    const slug = String(query).trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+    const data = await fetchJson(baseUrl || HENTAI_OCEAN_DEFAULT, `/?${new URLSearchParams({ action: "hentai", slug })}`, signal);
+    const item = data.info?.[0];
+    return item?.urlname ? [{ id: String(item.urlname), title: String(item.videoname || item.urlname), releaseDate: item.releasedate || "", subOrDub: "English subbed" }] : [];
+  }
   const data = await fetchJson(
     baseUrl || CONSUMET_DEFAULT,
     `/anime/${provider}/${encodeURIComponent(query)}`,
@@ -79,6 +87,7 @@ export async function getStreamInfo({
   signal,
 }) {
   checkProvider(provider);
+  if (provider === "hentaiocean") return { title: "", totalEpisodes: 1, episodes: [{ id: String(id), number: 1, title: "Full video" }] };
   if (provider === "animeparadise") {
     const data = await fetchJson(
       baseUrl || ANIMEPARADISE_DEFAULT,
@@ -126,6 +135,7 @@ export async function getEpisodeSources({
   signal,
 }) {
   checkProvider(provider);
+  if (provider === "hentaiocean") return { needsHeaders: false, embed: `${baseUrl || HENTAI_OCEAN_DEFAULT}/embed/${encodeURIComponent(episodeId)}?la=1`, sources: [] };
   if (provider === "animeparadise") {
     const divider = episodeId.lastIndexOf(":");
     if (divider < 1) throw new Error("Invalid AnimeParadise episode ID.");

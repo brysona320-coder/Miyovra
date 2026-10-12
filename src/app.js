@@ -16,7 +16,9 @@ import {
   searchStreams,
   getStreamInfo,
   getEpisodeSources,
+  HENTAI_OCEAN_DEFAULT,
 } from "./streaming.js?v=20260925-6";
+import { isAdultVerified } from "./adult.js?v=20261012-adult1";
 
 const STORAGE = {
   favorites: "aniwatch:favorites",
@@ -25,6 +27,7 @@ const STORAGE = {
   aniapiUrl: "aniwatch:aniapi-url",
   consumetUrl: "aniwatch:consumet-url",
   animeparadiseUrl: "aniwatch:animeparadise-url",
+  hentaiOceanUrl: "aniwatch:hentaiocean-url",
   proxyEnabled: "aniwatch:scramjet-proxy-enabled",
   proxyUrl: "aniwatch:scramjet-proxy-url",
   proxyEngine: "aniwatch:proxy-engine",
@@ -72,6 +75,7 @@ const elements = {
   aniapiUrl: $("#aniapi-url"),
   consumetUrl: $("#consumet-url"),
   animeparadiseUrl: $("#animeparadise-url"),
+  hentaiOceanUrl: $("#hentaiocean-url"),
   proxyEnabled: $("#scramjet-proxy-enabled"),
   proxyUrl: $("#scramjet-proxy-url"),
   proxyPreset: $("#proxy-preset"),
@@ -86,6 +90,7 @@ const elements = {
   watchClose: $("#watch-close"),
   watchPlayer: $(".watch-player"),
   watchVideo: $("#watch-video"),
+  watchEmbed: $("#watch-embed"),
   watchTitle: $("#watch-title"),
   watchDescription: $("#watch-description"),
   watchError: $("#watch-error"),
@@ -145,6 +150,7 @@ const state = {
     validBaseUrl(
       readStorage(STORAGE.animeparadiseUrl, ANIMEPARADISE_DEFAULT),
     ) || ANIMEPARADISE_DEFAULT,
+  hentaiOceanUrl: validBaseUrl(readStorage(STORAGE.hentaiOceanUrl, HENTAI_OCEAN_DEFAULT)) || HENTAI_OCEAN_DEFAULT,
   proxyEnabled: Boolean(readStorage(STORAGE.proxyEnabled, false)),
   proxyUrl: validProxyTemplate(readStorage(STORAGE.proxyUrl, "")) || "",
   proxyEngine: readStorage(STORAGE.proxyEngine, "scramjet") === "terbium" ? "terbium" : "scramjet",
@@ -176,6 +182,7 @@ if (
   state.consumetUrl === CONSUMET_DEFAULT
 )
   state.streamProvider = "animeparadise";
+if (state.streamProvider === "hentaiocean" && !isAdultVerified()) state.streamProvider = "animeparadise";
 let hlsPlayer = null;
 
 function terbiumWispUrl(baseUrl) {
@@ -282,9 +289,9 @@ function syncWispPreset() {
 
 
 function streamBaseUrl() {
-  return state.streamProvider === "animeparadise"
-    ? state.animeparadiseUrl
-    : state.consumetUrl;
+  if (state.streamProvider === "animeparadise") return state.animeparadiseUrl;
+  if (state.streamProvider === "hentaiocean") return state.hentaiOceanUrl;
+  return state.consumetUrl;
 }
 
 function plainText(html) {
@@ -374,6 +381,16 @@ async function searchWatch() {
       signal: request.signal,
     });
     if (request.id !== state.streamRequestId) return;
+    if (result.embed) {
+      elements.watchVideo.hidden = true;
+      elements.watchEmbed.hidden = false;
+      elements.watchEmbed.src = result.embed;
+      elements.quality.replaceChildren(new Option("Embedded player", "0"));
+      elements.quality.disabled = true;
+      elements.streamEpisodes.querySelectorAll("button").forEach((item) => item.classList.toggle("active", item === button));
+      elements.watchDescription.textContent = `${state.streamTitle} · Episode ${episode.number}`;
+      return;
+    }
     elements.watchDescription.textContent = matches.length
       ? "Choose the matching series to see its episodes."
       : "No matching series found. Try the other streaming source.";
@@ -535,6 +552,9 @@ function clearVideoOnly() {
   elements.watchVideo.pause();
   elements.watchVideo.removeAttribute("src");
   elements.watchVideo.load();
+  elements.watchVideo.hidden = false;
+  elements.watchEmbed.hidden = true;
+  elements.watchEmbed.removeAttribute("src");
 }
 function updateWatchlistControls() {
   elements.watchlist.setAttribute("aria-pressed", String(state.watchlist));
@@ -909,6 +929,11 @@ elements.search.addEventListener("input", () => {
   }, 500);
 });
 function setStreamProvider(provider) {
+  if (provider === "hentaiocean" && !isAdultVerified()) {
+    elements.provider.value = state.streamProvider;
+    document.querySelector("#account-button")?.click();
+    return;
+  }
   state.streamProvider = provider;
   elements.provider.value = provider;
   elements.watchProvider.value = provider;
@@ -949,6 +974,7 @@ elements.resetUrls.addEventListener("click", () => {
   state.aniapiUrl = ANIAPI_DEFAULT;
   state.consumetUrl = CONSUMET_DEFAULT;
   state.animeparadiseUrl = ANIMEPARADISE_DEFAULT;
+  state.hentaiOceanUrl = HENTAI_OCEAN_DEFAULT;
   state.proxyEnabled = false;
   state.proxyUrl = "";
   state.proxyEngine = "scramjet";
@@ -970,9 +996,11 @@ elements.resetUrls.addEventListener("click", () => {
   elements.aniapiUrl.value = ANIAPI_DEFAULT;
   elements.consumetUrl.value = CONSUMET_DEFAULT;
   elements.animeparadiseUrl.value = ANIMEPARADISE_DEFAULT;
+  elements.hentaiOceanUrl.value = HENTAI_OCEAN_DEFAULT;
   writeStorage(STORAGE.aniapiUrl, ANIAPI_DEFAULT);
   writeStorage(STORAGE.consumetUrl, CONSUMET_DEFAULT);
   writeStorage(STORAGE.animeparadiseUrl, ANIMEPARADISE_DEFAULT);
+  writeStorage(STORAGE.hentaiOceanUrl, HENTAI_OCEAN_DEFAULT);
   state.catalogProvider = "animeparadise";
   elements.catalogProvider.value = "animeparadise";
   writeStorage(STORAGE.catalogProvider, "animeparadise");
@@ -985,7 +1013,8 @@ elements.settingsForm.addEventListener("submit", (event) => {
   const aniapiUrl = validBaseUrl(elements.aniapiUrl.value.trim());
   const consumetUrl = validBaseUrl(elements.consumetUrl.value.trim());
   const animeparadiseUrl = validBaseUrl(elements.animeparadiseUrl.value.trim());
-  if (!aniapiUrl || !consumetUrl || !animeparadiseUrl) {
+  const hentaiOceanUrl = validBaseUrl(elements.hentaiOceanUrl.value.trim()) || HENTAI_OCEAN_DEFAULT;
+  if (!aniapiUrl || !consumetUrl || !animeparadiseUrl || !hentaiOceanUrl) {
     elements.settingsMessage.textContent =
       "Use HTTPS URLs, or local HTTP URLs during development.";
     return;
@@ -997,7 +1026,8 @@ elements.settingsForm.addEventListener("submit", (event) => {
   const streamChanged =
     (state.streamProvider === "animeparadise" &&
       state.animeparadiseUrl !== animeparadiseUrl) ||
-    (state.streamProvider !== "animeparadise" &&
+    (state.streamProvider === "hentaiocean" && state.hentaiOceanUrl !== hentaiOceanUrl) ||
+    (state.streamProvider !== "animeparadise" && state.streamProvider !== "hentaiocean" &&
       state.consumetUrl !== consumetUrl);
   state.aniapiUrl = aniapiUrl;
   state.consumetUrl = consumetUrl;
@@ -1015,6 +1045,7 @@ elements.settingsForm.addEventListener("submit", (event) => {
   }
 
   state.animeparadiseUrl = animeparadiseUrl;
+  state.hentaiOceanUrl = hentaiOceanUrl;
   state.proxyEnabled = elements.proxyEnabled.checked;
   state.proxyUrl = proxyUrl;
   state.proxyEngine = proxyEngine;
@@ -1026,6 +1057,7 @@ elements.settingsForm.addEventListener("submit", (event) => {
   writeStorage(STORAGE.aniapiUrl, aniapiUrl);
   writeStorage(STORAGE.consumetUrl, consumetUrl);
   writeStorage(STORAGE.animeparadiseUrl, animeparadiseUrl);
+  writeStorage(STORAGE.hentaiOceanUrl, hentaiOceanUrl);
   writeStorage(STORAGE.proxyEnabled, state.proxyEnabled);
   writeStorage(STORAGE.proxyUrl, state.proxyUrl);
   elements.settingsMessage.textContent = state.proxyEnabled
@@ -1118,6 +1150,7 @@ syncApiPreset();
 elements.aniapiUrl.value = state.aniapiUrl;
 elements.consumetUrl.value = state.consumetUrl;
 elements.animeparadiseUrl.value = state.animeparadiseUrl;
+elements.hentaiOceanUrl.value = state.hentaiOceanUrl;
 elements.proxyEnabled.checked = state.proxyEnabled;
 elements.proxyUrl.value = state.proxyUrl;
 syncProxyPreset();

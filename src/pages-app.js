@@ -100,7 +100,7 @@ function injectUi() {
       '<label>Avatar<input id="profile-avatar-input" type="file" accept="image/png,image/jpeg,image/webp,image/gif"></label>',
       '<label>Default audio<select id="profile-audio"><option value="japanese">Japanese</option><option value="english">English dub</option></select></label>',
       '<label>Default subtitles<select id="profile-subtitle"><option value="english">English</option><option value="none">Off</option></select></label>',
-      '<button class="primary-action" type="submit">Save profile</button></form></section>',
+      '<button class="primary-action" type="submit">Save profile</button></form><section class="restricted-access"><h4>Restricted source</h4><p id="adult-access-message">Log in and verify your age to unlock HentaiOcean.</p><label class="check-row"><input id="adult-access-check" type="checkbox"> I confirm I am of legal age in my location.</label><button type="button" id="adult-access-revoke" hidden>Revoke access</button></section></section>',
       '<section data-panel="appearance" hidden><h3>Theme & interface</h3><form id="appearance-form">',
       '<label>Theme<select id="appearance-theme"><option value="DARK">Dark</option><option value="LIGHT">Light</option><option value="CUSTOM">Custom</option></select></label>',
       '<label>Accent color<input id="appearance-accent" type="color"></label>',
@@ -239,6 +239,8 @@ async function refreshSession() {
 function renderAccount() {
   const configured = Boolean(state.supabase);
   const signedIn = Boolean(configured && state.user && state.profile);
+  window.__miyovraUser = signedIn ? state.user : null;
+  window.dispatchEvent(new CustomEvent("miyovra-auth-changed", { detail: { user: window.__miyovraUser } }));
   $("#cloud-missing").hidden = configured;
   $("#auth-view").hidden = !configured || signedIn;
   $("#account-view").hidden = !signedIn;
@@ -249,7 +251,13 @@ function renderAccount() {
     applyProfileTheme();
     loadLists();
     loadContinueWatching();
+    const verified = localStorage.getItem(`miyovra:adult-verified:${state.user.id}`) === "true";
+    document.querySelectorAll('option[value="hentaiocean"]').forEach((option) => (option.hidden = !verified));
+    if ($("#adult-access-check")) $("#adult-access-check").checked = verified;
+    if ($("#adult-access-revoke")) $("#adult-access-revoke").hidden = !verified;
+    if ($("#adult-access-message")) $("#adult-access-message").textContent = verified ? "Adult access is verified for this account on this device." : "Log in and verify your age to unlock HentaiOcean.";
   } else {
+    document.querySelectorAll('option[value="hentaiocean"]').forEach((option) => (option.hidden = true));
     $("#continue-watching").hidden = true;
   }
 }
@@ -559,6 +567,26 @@ function bindUi() {
   $("#account-close").addEventListener("click", () => $("#account-dialog").close());
   $("#account-dialog").addEventListener("click", (event) => {
     if (event.target === $("#account-dialog")) $("#account-dialog").close();
+  });
+  $("#adult-access-check").addEventListener("change", (event) => {
+    if (!state.user) {
+      event.target.checked = false;
+      $("#adult-access-message").textContent = "Log in before verifying adult access.";
+      return;
+    }
+    if (event.target.checked) {
+      localStorage.setItem(`miyovra:adult-verified:${state.user.id}`, "true");
+      $("#adult-access-message").textContent = "Adult access is verified for this account on this device.";
+      $("#adult-access-revoke").hidden = false;
+      document.querySelectorAll('option[value="hentaiocean"]').forEach((option) => (option.hidden = false));
+    }
+  });
+  $("#adult-access-revoke").addEventListener("click", () => {
+    if (state.user) localStorage.removeItem(`miyovra:adult-verified:${state.user.id}`);
+    $("#adult-access-check").checked = false;
+    $("#adult-access-revoke").hidden = true;
+    $("#adult-access-message").textContent = "Adult access revoked.";
+    document.querySelectorAll('option[value="hentaiocean"]').forEach((option) => (option.hidden = true));
   });
   document.querySelectorAll("[data-auth]").forEach((button) => button.addEventListener("click", () => setAuthMode(button.dataset.auth)));
   document.querySelectorAll("[data-page]").forEach((button) => button.addEventListener("click", () => showPanel(button.dataset.page)));

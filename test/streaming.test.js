@@ -182,3 +182,25 @@ test("Consumet rejects malformed responses and non-HTTPS video URLs", async () =
     },
   );
 });
+
+test("HentaiOcean resolves a slug and uses its documented embed player", async () => {
+  await withFetch(
+    { info: [{ urlname: "sample-title-1", videoname: "Sample Title 1" }] },
+    async (request) => {
+      const matches = await searchStreams({
+        provider: "hentaiocean",
+        baseUrl: "https://hentaiocean.com",
+        query: "Sample Title 1",
+      });
+      assert.match(request().url, /action=hentai/);
+      assert.equal(matches[0].id, "sample-title-1");
+    },
+  );
+  const result = await getEpisodeSources({
+    provider: "hentaiocean",
+    baseUrl: "https://hentaiocean.com",
+    episodeId: "sample-title-1",
+  });
+  assert.equal(result.embed, "https://hentaiocean.com/embed/sample-title-1?la=1");
+  assert.deepEqual(result.sources, []);
+});

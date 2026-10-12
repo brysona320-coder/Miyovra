@@ -830,6 +830,12 @@ main {
 .watch-player {
   background: #000;
 }
+.watch-player iframe {
+  width: 100%;
+  min-height: 460px;
+  border: 0;
+  background: #000;
+}
 .watch-player[hidden] {
   display: none;
 }

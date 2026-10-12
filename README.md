@@ -2,6 +2,8 @@
 
 Miyovra is a static anime frontend hosted on **GitHub Pages**.
 
+HentaiOcean is an optional restricted streaming source. It is only exposed to signed-in users who complete the adult verification prompt in their Miyovra account panel, and playback uses HentaiOcean's documented embed API. The browser gate is a product access control; production deployments should add server-side age or identity verification.
+
 Features include email/password accounts through Supabase, profile avatars, Continue Watching sync, public/private lists, player customization, and browser offline downloads.
 
 ## Monetization

@@ -66,7 +66,8 @@
             ><select id="provider-select" aria-label="Streaming API provider">
               <option value="animeparadise">AnimeParadise</option>
               <option value="animekai">AnimeKai</option>
-              <option value="animepahe">Animepahe</option></select
+              <option value="animepahe">Animepahe</option>
+              <option value="hentaiocean" hidden>HentaiOcean · verified</option></select
             ><svg aria-hidden="true" viewBox="0 0 12 12" fill="none">
               <path
                 d="m2 4 4 4 4-4"
@@ -166,6 +167,11 @@
           <label
             >Consumet base URL <input id="consumet-url" type="url" required
           /></label>
+          <label
+            >HentaiOcean API base URL
+            <input id="hentaiocean-url" type="url" value="https://hentaiocean.com" required
+          /></label>
+          <p>HentaiOcean is available only to signed-in users who complete the adult verification prompt. Production deployments should pair this with server-side age or identity verification.</p>
           <label class="proxy-setting">
             <span>Proxy engine</span>
             <span class="proxy-toggle">
@@ -342,6 +348,7 @@
       </button>
       <div class="watch-player" hidden>
         <video id="watch-video" controls playsinline preload="none"></video>
+        <iframe id="watch-embed" title="Restricted video player" allowfullscreen hidden></iframe>
       </div>
       <div class="watch-info">
         <span class="section-kicker" id="watch-provider-label"
@@ -364,6 +371,7 @@
             <option value="animeparadise">AnimeParadise</option>
             <option value="animekai">AnimeKai</option>
             <option value="animepahe">Animepahe</option>
+            <option value="hentaiocean" hidden>HentaiOcean · verified</option>
           </select>
         </label>
         <form id="stream-search-form" class="stream-search" role="search">
