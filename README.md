@@ -28,6 +28,8 @@ In the repository open:
 
 The workflow in `.github/workflows/pages.yml` deploys pushes to `main`.
 
+Keep the Pages source set to **GitHub Actions**. **Deploy from a branch** publishes the empty configuration template in `src/runtime-config.js` and can overwrite the configured workflow deployment, causing the account button to show **Cloud setup** even when the Supabase variables exist.
+
 Expected site URL:
 
 ```
