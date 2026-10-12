@@ -1,4 +1,5 @@
 import { RUNTIME_CONFIG } from "./runtime-config.js";
+import { authErrorMessage, isInAppBrowser } from "./auth-errors.js";
 
 const state = {
   supabase: null,
@@ -91,7 +92,7 @@ function injectUi() {
       '<label>Email<input id="auth-email" type="email" required autocomplete="email"></label>',
       '<label>Password<input id="auth-password" type="password" minlength="8" required autocomplete="current-password"></label>',
       '<button class="primary-action" id="auth-submit" type="submit">Log in</button>',
-      '<p id="auth-message" class="form-message"></p></form></div>',
+      '<p id="auth-message" class="form-message" role="status" aria-live="polite"></p></form></div>',
       '<div id="account-view" hidden>',
       '<section data-panel="profile"><h3>Profile</h3><div class="profile-card">',
       '<img id="profile-avatar" class="profile-avatar" alt=""><div><strong id="profile-name"></strong><span id="profile-email"></span></div></div>',
@@ -145,8 +146,15 @@ function injectUi() {
   }
 }
 
+function setAuthMessage(message, success = false) {
+  const node = $("#auth-message");
+  node.textContent = message;
+  node.dataset.status = message ? (success ? "success" : "error") : "";
+}
+
 function setAuthMode(mode) {
   const signup = mode === "signup";
+  setAuthMessage("");
   $("#signup-name-row").hidden = !signup;
   $("#auth-name").required = signup;
   $("#auth-submit").textContent = signup ? "Create account" : "Log in";
@@ -558,8 +566,12 @@ function bindUi() {
   $("#auth-form").addEventListener("submit", async (event) => {
     event.preventDefault();
     if (!state.supabase) return;
-    $("#auth-message").textContent = "";
+    const button = $("#auth-submit");
+    if (button.disabled) return; // Prevent duplicate signup requests.
     const mode = event.currentTarget.dataset.mode || "login";
+    setAuthMessage("");
+    button.disabled = true;
+    button.textContent = mode === "signup" ? "Creating account…" : "Logging in…";
     try {
       if (mode === "signup") {
         const result = await state.supabase.auth.signUp({
@@ -571,21 +583,48 @@ function bindUi() {
           }
         });
         if (result.error) throw result.error;
+        if (!result.data?.user) throw new Error("Signup did not return an account. Please try again.");
         if (!result.data.session) {
-          $("#auth-message").textContent = "Account created. Check your email to confirm it, then log in.";
+          setAuthMessage("Account created. Check your email to confirm it, then log in.", true);
           return;
         }
-      } else {
-        const result = await state.supabase.auth.signInWithPassword({
-          email: $("#auth-email").value.trim(),
-          password: $("#auth-password").value
-        });
-        if (result.error) throw result.error;
+        // Account creation has succeeded; a subsequent profile fetch failure
+        // must not be misreported as a failed signup.
+        try {
+          await refreshSession();
+          if (state.user && state.profile) {
+            showPanel("profile");
+          } else {
+            setAuthMessage("Account created, but your profile didn't load. Refresh the page or log in again.", true);
+          }
+        } catch (error) {
+          console.warn("Account created, but profile sync failed", error);
+          setAuthMessage("Account created, but your profile didn't load. Refresh the page or log in again.", true);
+        }
+        return;
       }
+
+      const result = await state.supabase.auth.signInWithPassword({
+        email: $("#auth-email").value.trim(),
+        password: $("#auth-password").value
+      });
+      if (result.error) throw result.error;
       await refreshSession();
-      showPanel("profile");
+      if (state.user && state.profile) {
+        showPanel("profile");
+      } else {
+        setAuthMessage("Signed in, but your profile didn't load. Refresh the page and try again.");
+      }
     } catch (error) {
-      $("#auth-message").textContent = error.message;
+      console.warn("Miyovra account request failed", error);
+      setAuthMessage(authErrorMessage(error, {
+        mode,
+        inAppBrowser: isInAppBrowser(navigator.userAgent),
+        online: navigator.onLine !== false
+      }));
+    } finally {
+      button.disabled = false;
+      button.textContent = event.currentTarget.dataset.mode === "signup" ? "Create account" : "Log in";
     }
   });
 
