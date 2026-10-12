@@ -22,8 +22,8 @@ jobs:
 
       - name: Prepare static site
         env:
-          SUPABASE_URL: ${{ vars.SUPABASE_URL }}
-          SUPABASE_PUBLISHABLE_KEY: ${{ vars.SUPABASE_PUBLISHABLE_KEY }}
+          SUPABASE_URL: ${{ vars.SUPABASE_URL || secrets.SUPABASE_URL }}
+          SUPABASE_PUBLISHABLE_KEY: ${{ vars.SUPABASE_PUBLISHABLE_KEY || vars.SUPABASE_ANON_KEY || secrets.SUPABASE_PUBLISHABLE_KEY || secrets.SUPABASE_ANON_KEY }}
         run: |
           mkdir -p _site
           rsync -a ./ _site/ \
@@ -37,6 +37,8 @@ jobs:
             --arg supabasePublishableKey "$SUPABASE_PUBLISHABLE_KEY" \
             '{supabaseUrl:$supabaseUrl,supabasePublishableKey:$supabasePublishableKey}' \
             > /tmp/aniwatch-config.json
+          test -n "$SUPABASE_URL" || (echo "Missing SUPABASE_URL repository variable/secret" && exit 1)
+          test -n "$SUPABASE_PUBLISHABLE_KEY" || (echo "Missing SUPABASE_PUBLISHABLE_KEY or SUPABASE_ANON_KEY repository variable/secret" && exit 1)
           printf 'export const RUNTIME_CONFIG = Object.freeze(%s);\n' "$(cat /tmp/aniwatch-config.json)" > _site/src/runtime-config.js
           touch _site/.nojekyll
 

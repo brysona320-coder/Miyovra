@@ -59,6 +59,16 @@ function createCloudClient() {
   );
 }
 
+async function waitForSupabaseSdk(timeoutMs = 5000) {
+  if (window.supabase?.createClient) return true;
+  const started = Date.now();
+  while (Date.now() - started < timeoutMs) {
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    if (window.supabase?.createClient) return true;
+  }
+  return false;
+}
+
 function injectUi() {
   const actions = $(".header-actions");
   if (actions && !$("#account-button")) {
@@ -794,6 +804,7 @@ async function showPublicList() {
 async function init() {
   injectUi();
   setAuthMode("login");
+  await waitForSupabaseSdk();
   state.supabase = createCloudClient();
   bindUi();
   bindPlayer();

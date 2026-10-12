@@ -55,6 +55,8 @@ SUPABASE_URL
 SUPABASE_PUBLISHABLE_KEY
 ```
 
+The workflow also accepts `SUPABASE_ANON_KEY`, and it checks both Actions Variables and Actions Secrets. After adding or changing them, run the **Deploy GitHub Pages** workflow again or push a new commit so `src/runtime-config.js` is regenerated.
+
 Add this URL to the allowed Supabase Auth site/redirect URLs:
 
 ```
