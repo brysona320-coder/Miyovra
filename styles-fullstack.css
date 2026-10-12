@@ -69,7 +69,9 @@
   background: var(--accent); color: white; font: inherit; font-weight: 700;
 }
 .auth-tabs { display: flex; gap: .5rem; margin-bottom: 1.4rem; }
-.form-message { min-height: 1.2rem; color: #ff9a9a; }
+.form-message { min-height: 1.2rem; color: #ff9a9a; line-height: 1.5; }
+.form-message[data-status="success"] { color: #b6f0c9; }
+#auth-submit:disabled { opacity: .75; cursor: wait; }
 .profile-card { display: flex; align-items: center; gap: 1rem; margin-bottom: 1.5rem; }
 .profile-card > div { display: grid; gap: .2rem; }
 .profile-card span { color: #9b9baa; }
