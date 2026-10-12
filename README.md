@@ -61,6 +61,19 @@ https://brysona320-coder.github.io/Miyovra/
 
 The publishable key is a browser-facing key. Never expose a Supabase service-role/secret key on GitHub Pages.
 
+## If account signup shows "Load failed"
+
+Miyovra accounts require an active and reachable Supabase project. If someone opens the site from an Instagram message, they should open the site URL in Safari or Chrome and retry; embedded browsers can fail cross-origin requests.
+
+If signup still fails in a normal browser, the owner should:
+
+1. Check the Supabase project is running and that email signup is enabled under **Authentication → Providers**.
+2. Check **Supabase → Logs → Auth** around the failed signup, and verify the **Authentication → URL Configuration** site/redirect URL includes the published GitHub Pages URL above.
+3. Verify the GitHub Actions variables **SUPABASE_URL** and **SUPABASE_PUBLISHABLE_KEY** are correct, then re-run the Pages deployment.
+4. Make sure `supabase/schema.sql` has been applied in the project: it creates the signup trigger that initializes each account's profile and lists.
+
+Do not publish private credentials or ask someone to send you their password to debug a failure.
+
 ## Offline downloads
 
 The Service Worker stores supported media in browser Cache Storage and tracks downloads with IndexedDB. Whether a video can be saved depends on the upstream host's CORS/access rules and browser storage quota.
